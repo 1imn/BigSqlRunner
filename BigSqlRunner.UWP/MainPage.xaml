@@ -8,7 +8,8 @@
     mc:Ignorable="d"
     Loaded="Page_Loaded">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="5,5,5,5" RowSpacing="3">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" 
+          Padding="5,5,5,5" RowSpacing="6" ColumnSpacing="6">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250" />
             <ColumnDefinition Width="*" />
