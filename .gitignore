@@ -1,0 +1,5 @@
+/[Pp]ackages/
+[Bb]in/
+[Oo]bj/
+*.suo
+.vs/
