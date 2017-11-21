@@ -35,7 +35,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" MinHeight="100" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Grid.Column="0" Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Center" Text="Connection string:" />
         <TextBox Name="Tb_ConnectionStr" Grid.Column="1" Grid.Row="0" VerticalAlignment="Center" />
