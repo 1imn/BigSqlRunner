@@ -30,10 +30,5 @@ namespace BigSqlRunner.UWP.Library
         {
 
         }
-
-        public void Dispose()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

@@ -15,6 +15,8 @@ namespace BigSqlRunner.UWP.Library
 
         public bool EnableLogging { get; set; } = false;
         public string LogFilePath { get; set; } = null;
+        public bool CompactLog { get; set; } = true;
+        public int MaxLogItemCount { get; set; } = 10000;
 
         public int BatchSize { get; set; } = 1;
         public string SqlUnitEndingLine { get; set; } = "GO";
@@ -27,7 +29,7 @@ namespace BigSqlRunner.UWP.Library
 
         public BigSqlRunnerConfig(
             string connectionString, string bigSqlFilePath,
-            bool enableLogging = false, string logFilePath = null,
+            bool enableLogging = false, string logFilePath = null, bool compactLog = true, int maxLogItemCount = 10000,
             int batchSize = 1, string sqlUnitEndingLine = "GO",
             bool continueFromLastSessionWhenStarted = true, SessionSaveTypeEnum sessionSaveType = SessionSaveTypeEnum.SqlUnitIndex,
             int retryIntervalWhenError_Seconds = 3, int retryNumberWhenError = 9
@@ -46,6 +48,8 @@ namespace BigSqlRunner.UWP.Library
 
             EnableLogging = enableLogging;
             LogFilePath = logFilePath;
+            CompactLog = compactLog;
+            MaxLogItemCount = maxLogItemCount;
 
             BatchSize = batchSize;
             SqlUnitEndingLine = sqlUnitEndingLine;

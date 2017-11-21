@@ -7,7 +7,7 @@ using System.Collections;
 
 namespace LevelDB
 {
-    public class LevelDbWrapper<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
+    public class LevelDbWrapper<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>, IDisposable
     {
         protected DB _LevelDb { get; set; }
 
@@ -127,6 +127,11 @@ namespace LevelDB
                     iterator.Next();
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _LevelDb.Dispose();
         }
     }
 }

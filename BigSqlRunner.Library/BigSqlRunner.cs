@@ -244,7 +244,7 @@ namespace BigSqlRunner.Library
                         }
 
                         // report progress
-                        progressReporter?.Invoke(sqlUnitIndex + 1, affectedRows);
+                        progressReporter?.Invoke(sqlUnitIndex, affectedRows);
                     }
                 }
             }

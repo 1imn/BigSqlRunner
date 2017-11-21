@@ -2,4 +2,7 @@
 [Bb]in/
 [Oo]bj/
 *.suo
+*.csproj.user
 .vs/
+*/AppPackages/
+*/BundleArtifacts/

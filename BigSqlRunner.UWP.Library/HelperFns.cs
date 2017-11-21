@@ -44,13 +44,13 @@ namespace BigSqlRunner.UWP.Library
             return hashString.ToLower();
         }
 
-        public static bool TryThenException(Action action, TimeSpan retry_interval, bool throw_exception, int try_num, Action<Exception, int> retryReporter = null)
+        public static async Task<bool> TryThenException(Func<Task> action, TimeSpan retry_interval, bool throw_exception, int try_num, Func<Exception, int, Task> retryReporter = null)
         {
             for (int i = 0; i < try_num; i++)
             {
                 try
                 {
-                    action();
+                    await action();
                     return true;
                 }
                 catch (Exception e)
@@ -61,8 +61,8 @@ namespace BigSqlRunner.UWP.Library
                         else { return false; }
                     }
 
-                    retryReporter?.Invoke(e, i);
-                    Thread.Sleep(retry_interval);
+                    if (null != retryReporter) await retryReporter(e, i);
+                    await Task.Delay(retry_interval);
                     continue;
                 }
             }

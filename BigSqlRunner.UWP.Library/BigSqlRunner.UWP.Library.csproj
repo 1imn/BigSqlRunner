@@ -109,18 +109,18 @@
     <Compile Include="BigSqlRunner.cs" />
     <Compile Include="BigSqlRunnerConfig.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="HelperFns.cs" />
     <Compile Include="JsonLevelDb.cs" />
     <Compile Include="LevelDbWrapper.cs" />
+    <Compile Include="Logging.cs" />
+    <Compile Include="NetPatch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SessionLevelDb.cs" />
     <Compile Include="SqlUnit.cs" />
     <EmbeddedResource Include="Properties\BigSqlRunner.UWP.Library.rd.xml" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Dapper">
-      <Version>1.50.2</Version>
-    </PackageReference>
     <PackageReference Include="LevelDB.UWP">
       <Version>1.18.3</Version>
     </PackageReference>

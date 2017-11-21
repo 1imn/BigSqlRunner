@@ -5,8 +5,12 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
+using Windows.Storage;
+using Windows.Storage.AccessCache;
+using Windows.Storage.Pickers;
 using Windows.UI.Popups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -20,70 +24,22 @@ using Windows.UI.Xaml.Navigation;
 
 namespace BigSqlRunner.UWP
 {
-    public enum ProgressDataTypeEnum
-    {
-        Progress,
-        Notification,
-    }
-    public class ProgressData
-    {
-        public ProgressDataTypeEnum Type { get; set; }
-
-        #region Progress type
-        public int? ExecutedSqlUnitCount { get; set; }
-        public int? AffectedRowCount { get; set; }
-        #endregion
-
-        #region Notification type
-        public string Message { get; set; }
-        #endregion
-
-        public ProgressData(int? executedSqlUnitCount, int? affectedRowCount) : this(ProgressDataTypeEnum.Progress, executedSqlUnitCount, affectedRowCount, null) { }
-        public ProgressData(string message) : this(ProgressDataTypeEnum.Notification, null, null, message) { }
-        public ProgressData(ProgressDataTypeEnum type, int? executedSqlUnitCount, int? affectedRowCount, string message)
-        {
-            Type = type;
-
-            #region Progress type
-            ExecutedSqlUnitCount = executedSqlUnitCount;
-            AffectedRowCount = affectedRowCount;
-            #endregion
-
-            #region Notification type
-            Message = message;
-            #endregion
-        }
-    }
-
-    public class LogItem
-    {
-        public ProgressDataTypeEnum LogType { get; set; }
-        public string Message { get; set; }
-
-        public LogItem(ProgressDataTypeEnum logType, string message)
-        {
-            LogType = logType;
-            Message = message;
-        }
-    }
-
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
     public partial class MainPage : Page
     {
-        protected Library.BigSqlRunner BigSqlRunner { get; set; }
-        protected BackgroundWorker BgWorker { get; set; } = new BackgroundWorker();
+        protected DateTime AppStartTime { get; set; } = DateTime.Now;
+        protected DateTime RunnerStartTime { get; set; } = DateTime.Now;
 
-        protected int LogQueueSize { get; set; } = 10000;
-        protected IList<LogItem> LogQueue { get; set; } = new List<LogItem>();
+        protected Library.BigSqlRunner BigSqlRunner { get; set; }
 
         public MainPage()
         {
             this.InitializeComponent();
         }
 
-        protected Library.BigSqlRunner CreateBigSqlRunner()
+        protected async Task<Library.BigSqlRunner> CreateBigSqlRunner()
         {
             var connectionString = Tb_ConnectionStr.Text;
             if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentException($"db connection string cannot be empty", nameof(Tb_ConnectionStr));
@@ -91,9 +47,18 @@ namespace BigSqlRunner.UWP
             var bigSqlFilePath = Tb_SqlFilePath.Text;
             if (string.IsNullOrWhiteSpace(bigSqlFilePath)) throw new ArgumentException($"big sql file path cannot be empty", nameof(Tb_SqlFilePath));
 
-            var enableLog = Cb_EnableLog.IsChecked.Value;
-            var logFilePath = Tb_LogFilePath.Text;
-            if (enableLog && string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException($"log file path cannot be empty", nameof(Tb_LogFilePath));
+            var logToFile = Cb_LogToFile.IsChecked.Value;
+            string logFilePath = null;
+            if (logToFile)
+            {
+                logFilePath = await Library.BigSqlRunner.GetLogFilePath_ByConnStrAndSqlFile(connectionString, bigSqlFilePath, RunnerStartTime);
+                if (false == NetPatch.FileExists(logFilePath))
+                {
+                    RunnerStartTime = DateTime.Now;
+                    logFilePath = await Library.BigSqlRunner.GetLogFilePath_ByConnStrAndSqlFile(connectionString, bigSqlFilePath, RunnerStartTime);
+                }
+            }
+            var compactLog = Cb_CompactLog.IsChecked.Value;
 
             var sqlUnitEndingLine = Tb_SqlUnitEndingLine.Text;
             if (string.IsNullOrWhiteSpace(sqlUnitEndingLine)) throw new ArgumentException($"sql unit ending line cannot be empty", nameof(Tb_SqlUnitEndingLine));
@@ -113,107 +78,45 @@ namespace BigSqlRunner.UWP
             if (false == int.TryParse(Tb_RetryNumber.Text, out retryNumber)) throw new ArgumentException($"the value specified for retry number is not a number", nameof(Tb_RetryNumber));
             else if (retryNumber < 0) throw new ArgumentException($"retry number must be >= 0", nameof(Tb_RetryNumber));
 
-            var bigSqlRunner = new Library.BigSqlRunner(connectionString, bigSqlFilePath, enableLog, logFilePath, batchSize, sqlUnitEndingLine, continueFromLastSession, sessionSaveType, retryIntervalSeconds, retryNumber);
+            var bigSqlRunner = new Library.BigSqlRunner(
+                connectionString: connectionString, bigSqlFilePath: bigSqlFilePath,
+                enableLogging: logToFile, logFilePath: logFilePath, compactLog: compactLog,
+                batchSize: batchSize, sqlUnitEndingLine: sqlUnitEndingLine,
+                continueFromLastSessionWhenStarted: continueFromLastSession, sessionSaveType: sessionSaveType,
+                retryIntervalWhenError_Seconds: retryIntervalSeconds, retryNumberWhenError: retryNumber);
             return bigSqlRunner;
         }
 
-        protected void DoWork(object sender, DoWorkEventArgs e)
+        protected async Task ShowLog(string log)
         {
-            BigSqlRunner.Run(
-                (executedUnits, affectedRows) => BgWorker.ReportProgress(-1, new ProgressData(executedUnits, affectedRows)),
-                message => BgWorker.ReportProgress(-1, new ProgressData(message))
-            );
-        }
-
-        protected void WriteLog(bool alsoWriteToFile)
-        {
-            var log = string.Join(Environment.NewLine, LogQueue.Select(li => li.Message).Reverse().ToList());
             Tb_Log.Text = log;
-
-            if (BigSqlRunner.Config.EnableLogging)
-            {
-                File.WriteAllText(BigSqlRunner.Config.LogFilePath, log);
-            }
+            await Task.CompletedTask;
         }
 
-        protected void WriteLogMessage(LogItem logItem)
+        protected async Task Run()
         {
-            lock (LogQueue)
+            try
             {
-                if (Cb_CompactLog.IsChecked.Value)
-                {
-                    var lastLogItem = LogQueue.LastOrDefault();
-                    if (
-                        ProgressDataTypeEnum.Progress == logItem.LogType
-                        && ProgressDataTypeEnum.Progress == lastLogItem?.LogType
-                    )
-                    {
-                        LogQueue.Remove(lastLogItem);
-                    }
-                }
+                BigSqlRunner.WriteLog += ShowLog;
 
-                LogQueue.Add(logItem);
-                if (LogQueue.Count() > LogQueueSize) LogQueue.RemoveAt(0);
-
-                WriteLog(ProgressDataTypeEnum.Notification == logItem.LogType);
+                await BigSqlRunner.Run((executedUnits, affectedRows) => { }, message => { });
             }
-        }
-
-        protected LogItem MakeLog(ProgressData progressData)
-        {
-            string message;
-            var nowStr = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-            var prefix = $"{nowStr}>  ";
-            switch (progressData.Type)
+            finally
             {
-                case ProgressDataTypeEnum.Progress:
-                    message = $"{prefix}{progressData.ExecutedSqlUnitCount} unit executed, {progressData.AffectedRowCount} rows affected.";
-                    break;
-
-                case ProgressDataTypeEnum.Notification:
-                    message = $"{prefix}{progressData.Message}";
-                    break;
-
-                default: throw new ArgumentException($"unknown value of enum {nameof(ProgressDataTypeEnum)}: {progressData.Type}", nameof(progressData));
+                BigSqlRunner.WriteLog -= ShowLog;
             }
 
-            var logItem = new LogItem(progressData.Type, message);
-            return logItem;
-        }
-
-        protected void ProgressChanged(object sender, ProgressChangedEventArgs e)
-        {
-            var progressData = e.UserState as ProgressData;
-            if (null == progressData) return;
-
-            WriteLogMessage(MakeLog(progressData));
-        }
-
-        protected void RemoveBgWorkerEh()
-        {
-            BgWorker.DoWork -= DoWork;
-            BgWorker.ProgressChanged -= ProgressChanged;
-            BgWorker.RunWorkerCompleted -= WorkerCompleted;
-        }
-
-        protected void WorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            RemoveBgWorkerEh();
             EnableInputs();
             ToggleRunCancelButtonEnabledState(false);
-
-            if (BigSqlRunner.IsStopped()) WriteLogMessage(MakeLog(new ProgressData("Canceled by user.")));
-            else if (null != e.Error) WriteLogMessage(MakeLog(new ProgressData(e.Error.Message)));
-            else WriteLogMessage(MakeLog(new ProgressData("Completed.")));
         }
+
 
         protected void ToggleInputEnabledState(bool enable)
         {
             Tb_ConnectionStr.IsEnabled = enable;
-            Tb_SqlFilePath.IsEnabled = enable;
+            //Tb_SqlFilePath.IsEnabled = enable;
 
-            Cb_EnableLog.IsEnabled = enable;
-            Tb_LogFilePath.IsEnabled = enable;
+            Cb_LogToFile.IsEnabled = enable;
 
             Tb_SqlUnitEndingLine.IsEnabled = enable;
             Tb_BatchSize.IsEnabled = enable;
@@ -254,21 +157,23 @@ namespace BigSqlRunner.UWP
             Tb_ConnectionStr.Text = config.ConnectionString;
             Tb_SqlFilePath.Text = config.BigSqlFilePath;
 
-            Cb_EnableLog.IsChecked = config.EnableLogging;
-            Tb_LogFilePath.Text = config.LogFilePath;
+            Cb_LogToFile.IsChecked = config.EnableLogging;
 
             Tb_SqlUnitEndingLine.Text = config.SqlUnitEndingLine;
             Tb_BatchSize.Text = config.BatchSize.ToString();
 
-            Cmb_SessionSaveType.SelectedValue = config.SessionSaveType;
+            Cmb_SessionSaveType.SelectedItem = config.SessionSaveType;
             Cb_ContinueFromLastSession.IsChecked = config.ContinueFromLastSessionWhenStarted;
 
             Tb_RetryIntervalSeconds.Text = ((int)config.RetryIntervalWhenError.TotalSeconds).ToString();
             Tb_RetryNumber.Text = config.RetryNumberWhenError.ToString();
         }
 
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+        private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            // debug
+            Tb_Debug.Text = (await Library.BigSqlRunner.GetLastConfigFilePath()) ?? "";
+
             // default settings
             {
                 Cmb_SessionSaveType.ItemsSource = Enum.GetValues(typeof(SessionSaveTypeEnum));
@@ -278,7 +183,8 @@ namespace BigSqlRunner.UWP
             // load saved settings
             try
             {
-                var bigSqlRunner = Library.BigSqlRunner.FromDefaultConfig();
+                var lastConfigFile = await Library.BigSqlRunner.GetLastConfigFilePath();
+                var bigSqlRunner = Library.BigSqlRunner.FromConfig(lastConfigFile);
                 LoadInputValueFromConfig(bigSqlRunner.Config);
             }
             catch { }
@@ -290,21 +196,16 @@ namespace BigSqlRunner.UWP
             {
                 ToggleRunCancelButtonEnabledState(true);
                 DisableInputs();
-                BigSqlRunner = CreateBigSqlRunner();
-                BigSqlRunner.SaveConfig(null);
+                BigSqlRunner = await CreateBigSqlRunner();
 
-                BgWorker.WorkerReportsProgress = true;
-                BgWorker.DoWork += DoWork;
-                BgWorker.ProgressChanged += ProgressChanged;
-                BgWorker.RunWorkerCompleted += WorkerCompleted;
+                var configFilePath = await Library.BigSqlRunner.GetConfigFilePath_ByConnStrAndSqlFile(
+                    BigSqlRunner.Config.ConnectionString, BigSqlRunner.Config.BigSqlFilePath);
+                BigSqlRunner.SaveConfig(configFilePath);
 
-                WriteLogMessage(MakeLog(new ProgressData("Started running...")));
-                BgWorker.RunWorkerAsync();
+                await Run();
             }
             catch (Exception ex)
             {
-                RemoveBgWorkerEh();
-
                 await new MessageDialog(ex.Message).ShowAsync();
 
                 EnableInputs();
@@ -316,6 +217,24 @@ namespace BigSqlRunner.UWP
         {
             Btn_Cancel.IsEnabled = false;
             BigSqlRunner.StopRunning();
+        }
+
+        private async void Btn_SelectSqlFile_Click(object sender, RoutedEventArgs e)
+        {
+            var fileOpenPicker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.List,
+                SuggestedStartLocation = PickerLocationId.ComputerFolder,
+            };
+            fileOpenPicker.FileTypeFilter.Add(".sql");
+
+            var storageFile = await fileOpenPicker.PickSingleFileAsync();
+            if (null == storageFile) return;
+
+            Tb_SqlFilePath.Text = storageFile.Path;
+
+            StorageApplicationPermissions.FutureAccessList.AddOrUpdate(storageFile);
+            StorageApplicationPermissions.MostRecentlyUsedList.AddOrUpdate(storageFile);
         }
     }
 }
