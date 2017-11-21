@@ -114,7 +114,8 @@ namespace BigSqlRunner.UWP
         protected void ToggleInputEnabledState(bool enable)
         {
             Tb_ConnectionStr.IsEnabled = enable;
-            //Tb_SqlFilePath.IsEnabled = enable;
+            Tb_SqlFilePath.IsEnabled = enable;
+            Btn_SelectSqlFile.IsEnabled = enable;
 
             Cb_LogToFile.IsEnabled = enable;
 
@@ -171,9 +172,6 @@ namespace BigSqlRunner.UWP
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            // debug
-            Tb_Debug.Text = (await Library.BigSqlRunner.GetLastConfigFilePath()) ?? "";
-
             // default settings
             {
                 Cmb_SessionSaveType.ItemsSource = Enum.GetValues(typeof(SessionSaveTypeEnum));

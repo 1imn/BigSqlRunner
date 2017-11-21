@@ -83,7 +83,5 @@
                  IsReadOnly="True"
                  AcceptsReturn="True" TextWrapping="NoWrap"
                  ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto" />
-
-        <TextBlock Name="Tb_Debug" Grid.ColumnSpan="2" Grid.Row="18" />
     </Grid>
 </Page>
