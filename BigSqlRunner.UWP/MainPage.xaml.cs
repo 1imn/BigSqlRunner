@@ -84,6 +84,7 @@ namespace BigSqlRunner.UWP
                 batchSize: batchSize, sqlUnitEndingLine: sqlUnitEndingLine,
                 continueFromLastSessionWhenStarted: continueFromLastSession, sessionSaveType: sessionSaveType,
                 retryIntervalWhenError_Seconds: retryIntervalSeconds, retryNumberWhenError: retryNumber);
+            await bigSqlRunner.LoadLogFile();
             return bigSqlRunner;
         }
 

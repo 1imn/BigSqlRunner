@@ -64,6 +64,11 @@ namespace BigSqlRunner.UWP.Library
             LogPool = new LogPool(config.MaxLogItemCount, config.CompactLog);
         }
 
+        public async Task LoadLogFile()
+        {
+            if (NetPatch.FileExists(Config.LogFilePath)) await LogPool.LoadLogFile(Config.LogFilePath);
+        }
+
         #region static
         protected static async Task<string> GetConfigDirPath()
             => (await ApplicationData.Current.LocalFolder.CreateFolderAsync(ConfigDirName, CreationCollisionOption.OpenIfExists)).Path;
@@ -275,7 +280,7 @@ namespace BigSqlRunner.UWP.Library
             try
             {
                 WriteLog += WriteLogToFile;
-                await LogPool.AddLog(LogItem.MakeLog(new ProgressData("Started running...")));
+                await LogPool.AddLog(LogItem.MakeLog(new LogMessage(">> Started running...")));
 
                 var bigSqlStorageFile = await StorageFile.GetFileFromPathAsync(Config.BigSqlFilePath);
                 if (null == bigSqlStorageFile) throw new ArgumentException($"specified big sql file not exist: {Config.BigSqlFilePath}", nameof(Config.BigSqlFilePath));
@@ -302,6 +307,7 @@ namespace BigSqlRunner.UWP.Library
                         // stop when requested
                         if (Stop)
                         {
+                            await LogPool.AddLog(LogItem.MakeLog(new LogMessage(">> Canceled by user.")));
                             StopCallBack?.Invoke();
                             return;
                         }
@@ -315,7 +321,7 @@ namespace BigSqlRunner.UWP.Library
                         var skipCount = unitIndexDiff - sqlUnitList.Count();
                         if (skipCount > 0)
                         {
-                            await LogPool.AddLog(LogItem.MakeLog(new ProgressData($"Skipped {skipCount} already executed units.")));
+                            await LogPool.AddLog(LogItem.MakeLog(new LogMessage($"Skipped {skipCount} already executed units.")));
                         }
 
                         // break when nothing to do
@@ -336,7 +342,7 @@ namespace BigSqlRunner.UWP.Library
                                 async (e, i) =>
                                 {
                                     var message = $"{e.Message}; retry in {Config.RetryIntervalWhenError.TotalSeconds} seconds...";
-                                    await LogPool.AddLog(LogItem.MakeLog(new ProgressData(message)));
+                                    await LogPool.AddLog(LogItem.MakeLog(new LogMessage(message)));
                                     errorReporter?.Invoke(message);
                                 }
                             );
@@ -348,14 +354,13 @@ namespace BigSqlRunner.UWP.Library
                             }
 
                             // report progress
-                            await LogPool.AddLog(LogItem.MakeLog(new ProgressData(sqlUnitIndex, affectedRows)));
+                            await LogPool.AddLog(LogItem.MakeLog(new LogMessage(sqlUnitIndex, affectedRows)));
                             progressReporter?.Invoke(sqlUnitIndex, affectedRows);
                         }
                     }
                 }
 
-                if (IsStopped()) await LogPool.AddLog(LogItem.MakeLog(new ProgressData("Canceled by user.")));
-                else await LogPool.AddLog(LogItem.MakeLog(new ProgressData("Completed.")));
+                await LogPool.AddLog(LogItem.MakeLog(new LogMessage(">> Completed.")));
             }
             finally
             {

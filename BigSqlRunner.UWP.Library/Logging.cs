@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -7,16 +8,16 @@ using System.Threading.Tasks;
 
 namespace BigSqlRunner.UWP.Library
 {
-    public enum ProgressDataTypeEnum
+    public enum LogMessageTypeEnum
     {
         Progress,
         Notification,
     }
-    public class ProgressData
+    public class LogMessage
     {
         public DateTime TimeUtc { get; set; }
 
-        public ProgressDataTypeEnum Type { get; set; }
+        public LogMessageTypeEnum Type { get; set; }
 
         #region Progress type
         public int? ExecutedSqlUnitCount { get; set; }
@@ -27,9 +28,9 @@ namespace BigSqlRunner.UWP.Library
         public string Message { get; set; }
         #endregion
 
-        public ProgressData(int? executedSqlUnitCount, int? affectedRowCount) : this(ProgressDataTypeEnum.Progress, executedSqlUnitCount, affectedRowCount, null) { }
-        public ProgressData(string message) : this(ProgressDataTypeEnum.Notification, null, null, message) { }
-        public ProgressData(ProgressDataTypeEnum type, int? executedSqlUnitCount, int? affectedRowCount, string message)
+        public LogMessage(int? executedSqlUnitCount, int? affectedRowCount) : this(LogMessageTypeEnum.Progress, executedSqlUnitCount, affectedRowCount, null) { }
+        public LogMessage(string message) : this(LogMessageTypeEnum.Notification, null, null, message) { }
+        public LogMessage(LogMessageTypeEnum type, int? executedSqlUnitCount, int? affectedRowCount, string message)
         {
             TimeUtc = DateTime.UtcNow;
 
@@ -48,36 +49,72 @@ namespace BigSqlRunner.UWP.Library
 
     public class LogItem
     {
-        public ProgressDataTypeEnum LogType { get; set; }
         public DateTime TimeUtc { get; set; }
+        public LogMessageTypeEnum Type { get; set; }
         public string Message { get; set; }
 
-        public LogItem(DateTime timeUtc, ProgressDataTypeEnum logType, string message)
+        public LogItem(DateTime timeUtc, LogMessageTypeEnum logType, string message)
         {
             TimeUtc = timeUtc;
-            LogType = logType;
+            Type = logType;
             Message = message;
         }
 
-        public static LogItem MakeLog(ProgressData progressData)
+        public static LogItem MakeLog(LogMessage logMessage)
         {
             string message;
-            var nowStr = $"{progressData.TimeUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}";
+            var nowStr = $"{logMessage.TimeUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss zzz}";
             var prefix = $"{nowStr}>  ";
-            switch (progressData.Type)
+            switch (logMessage.Type)
             {
-                case ProgressDataTypeEnum.Progress:
-                    message = $"{prefix}(p) {progressData.ExecutedSqlUnitCount} units executed, {progressData.AffectedRowCount} rows affected.";
+                case LogMessageTypeEnum.Progress:
+                    message = $"{prefix}(p) {logMessage.ExecutedSqlUnitCount} units executed, {logMessage.AffectedRowCount} rows affected.";
                     break;
 
-                case ProgressDataTypeEnum.Notification:
-                    message = $"{prefix}(n) {progressData.Message}";
+                case LogMessageTypeEnum.Notification:
+                    message = $"{prefix}(n) {logMessage.Message}";
                     break;
 
-                default: throw new ArgumentException($"unknown value of enum {nameof(ProgressDataTypeEnum)}: {progressData.Type}", nameof(progressData));
+                default: throw new ArgumentException($"unknown value of enum {nameof(LogMessageTypeEnum)}: {logMessage.Type}", nameof(logMessage));
             }
 
-            var logItem = new LogItem(progressData.TimeUtc, progressData.Type, message);
+            var logItem = new LogItem(logMessage.TimeUtc, logMessage.Type, message);
+            return logItem;
+        }
+
+        public static LogItem ParseLog(string logLine)
+        {
+            if (string.IsNullOrWhiteSpace(logLine)) throw new ArgumentException($"{nameof(logLine)} cannot be null or whitespace", nameof(logLine));
+
+            var splitByTime = logLine.Split(">", 2);
+            if (2 != splitByTime.Count()) throw new ArgumentException($"{nameof(logLine)} is of unknown format: [{logLine}]", nameof(logLine));
+
+            DateTime logTime;
+            var timeStr = splitByTime[0];
+            if (false == DateTime.TryParse(timeStr, out logTime)) throw new ArgumentException($"{nameof(logLine)} does not starts with time in a valid format: [{logLine}]", nameof(logLine));
+
+            var trimedRest = splitByTime[1].Trim();
+            if (false == trimedRest.StartsWith('(')) throw new ArgumentException($"{nameof(logLine)} does not have a log message type mark in expected position: [{logLine}]", nameof(logLine));
+
+            var msgTypeMarkEndIndex = trimedRest.IndexOf(')');
+            if (2 != msgTypeMarkEndIndex) throw new ArgumentException($"{nameof(logLine)} does not have a log message type mark in valid format: [{logLine}]", nameof(logLine));
+
+            LogMessageTypeEnum msgType;
+            var msgTypeMark = trimedRest.Substring(1, msgTypeMarkEndIndex - 1);
+            switch (msgTypeMark)
+            {
+                case "n":
+                    msgType = LogMessageTypeEnum.Notification;
+                    break;
+
+                case "p":
+                    msgType = LogMessageTypeEnum.Progress;
+                    break;
+
+                default: throw new ArgumentException($"the log message type mark in {nameof(logLine)} is unknown: {msgTypeMark}", nameof(logLine));
+            }
+
+            var logItem = new LogItem(logTime.ToUniversalTime(), msgType, logLine);
             return logItem;
         }
     }
@@ -133,8 +170,8 @@ namespace BigSqlRunner.UWP.Library
                 {
                     var lastLogItem = LogQueue.LastOrDefault();
                     if (
-                        ProgressDataTypeEnum.Progress == logItem.LogType
-                        && ProgressDataTypeEnum.Progress == lastLogItem?.LogType
+                        LogMessageTypeEnum.Progress == logItem.Type
+                        && LogMessageTypeEnum.Progress == lastLogItem?.Type
                     )
                     {
                         LogQueue.Remove(lastLogItem);
@@ -165,6 +202,25 @@ namespace BigSqlRunner.UWP.Library
                     catch { }
                 }
             }
+        }
+
+        public async Task LoadLogFile(string logFile)
+        {
+            var logItemList = new List<LogItem>();
+            using (var streamReader = new StreamReader(logFile))
+            {
+                string logLine = null;
+                while (null != (logLine = await streamReader.ReadLineAsync()))
+                {
+                    var logItem = LogItem.ParseLog(logLine);
+                    logItemList.Add(logItem);
+
+                    if (logItemList.Count() == LogQueueSize) break;
+                }
+            }
+
+            logItemList.Reverse();
+            LogQueue = logItemList;
         }
     }
 }
