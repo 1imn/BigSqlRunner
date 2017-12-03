@@ -1,0 +1,46 @@
+﻿<UserControl
+    x:Class="BigSqlRunner.UWP.ServerConnectionInputBox"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:BigSqlRunner.UWP"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DesignWidth="400"
+    d:DesignHeight="300">
+
+    <Grid Height="Auto" RowSpacing="5" ColumnSpacing="5" VerticalAlignment="Center" Padding="5">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.Resources>
+            <Style x:Key="GridItemStyle" TargetType="FrameworkElement">
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+            <Style x:Key="GridItemStyle_LeftColumn" TargetType="FrameworkElement" BasedOn="{StaticResource GridItemStyle}">
+                <Setter Property="HorizontalAlignment" Value="Right" />
+            </Style>
+            <Style x:Key="GridItemStyle_RightColumn" TargetType="FrameworkElement" BasedOn="{StaticResource GridItemStyle}">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+            </Style>
+        </Grid.Resources>
+        <TextBlock Grid.Row="0" Grid.Column="0" Name="Tblk_ServerAddress" Text="Server:" Style="{StaticResource GridItemStyle_LeftColumn}" />
+        <TextBox Grid.Row="0" Grid.Column="1" Name="Tbox_ServerAddress" Style="{StaticResource GridItemStyle_RightColumn}" />
+
+        <TextBlock Grid.Row="1" Grid.Column="0" Name="Tblk_UserName" Text="User Name:" Style="{StaticResource GridItemStyle_LeftColumn}" />
+        <TextBox Grid.Row="1" Grid.Column="1" Name="Tbox_UserName" Style="{StaticResource GridItemStyle_RightColumn}" />
+
+        <TextBlock Grid.Row="2" Grid.Column="0" Name="Tblk_Password" Text="Password:" Style="{StaticResource GridItemStyle_LeftColumn}" />
+        <PasswordBox Grid.Row="2" Grid.Column="1" Name="Pbox_Password" Style="{StaticResource GridItemStyle_RightColumn}" />
+
+        <TextBlock Grid.Row="3" Grid.Column="0" Name="Tblk_RememberPassword" Text="Remember Password:" Style="{StaticResource GridItemStyle_LeftColumn}" />
+        <CheckBox Grid.Row="3" Grid.Column="1" Name="Chkbox_RememberPassword" IsChecked="False" Style="{StaticResource GridItemStyle_RightColumn}" HorizontalAlignment="Left" />
+    </Grid>
+</UserControl>

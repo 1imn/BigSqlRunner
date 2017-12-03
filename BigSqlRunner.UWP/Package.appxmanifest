@@ -7,7 +7,7 @@
   
   <Identity 
     Name="79970622-5eae-4ecd-8982-a1baa6aebbfb" 
-    Publisher="CN=hulki" 
+    Publisher="CN=biggray" 
     Version="1.0.1.0" />
   
   <mp:PhoneIdentity 
@@ -16,7 +16,7 @@
   
   <Properties>
     <DisplayName>BigSqlRunner.UWP</DisplayName>
-    <PublisherDisplayName>hulki</PublisherDisplayName>
+    <PublisherDisplayName>biggray</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   
